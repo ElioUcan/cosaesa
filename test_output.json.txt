@@ -1,0 +1,30 @@
+import json
+
+# Estructura simulada del tráfico interceptado
+traffic_data = [
+    {
+        "host": "example.com",
+        "method": "GET",
+        "path": "/",
+        "status_code": 200,
+        "timestamp": "2023-07-29T12:00:00",
+        "content_type": "text/html"
+    },
+    {
+        "host": "example.com",
+        "method": "POST",
+        "path": "/submit",
+        "status_code": 302,
+        "timestamp": "2023-07-29T12:05:00",
+        "content_type": "application/json"
+    }
+]
+
+# Ruta donde se guardará el archivo JSON
+output_file = "C:/Users/Elio/logs/test_output.json"
+
+# Guardar los datos en formato JSON
+with open(output_file, 'w') as file:
+    json.dump(traffic_data, file, indent=2)
+
+print(f"Log file saved to {output_file}")
