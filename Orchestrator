@@ -1,0 +1,100 @@
+import json
+import paramiko
+import time
+import os
+from datetime import datetime
+from parse_mitm_log import parse_log
+
+paramiko.util.log_to_file('paramiko.log')
+
+# Load config
+with open("config/vm_config.json") as f:
+    config = json.load(f)
+
+VM_IP = config["vm_ip"]
+SSH_PORT = config["ssh_port"]
+SSH_USER = config["username"]
+SSH_PASS = config["password"]
+BROWSER_PATHS = config["browser_paths"]
+
+START_CAPTURE = "C:\\Users\\ElioZapata\\Documents\\MajorScripts\\scripts\\remote_start_capture.ps1"
+STOP_CAPTURE = "C:\\Users\\ElioZapata\\Documents\\MajorScripts\\scripts\\remote_stop_capture.ps1"
+OPEN_BROWSER = "C:\\Users\\ElioZapata\\Documents\\MajorScripts\\scripts\\remote_open_browser.ps1"
+
+# Connect
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+print(f"[*] Connecting to {SSH_USER}@{VM_IP}:{SSH_PORT} ...")
+ssh.connect(hostname=VM_IP, port=SSH_PORT, username=SSH_USER, password=SSH_PASS)
+print("[✓] Connected.")
+
+for browser_name in ["opera", "chrome", "edge"]:
+    BROWSER_PATH = BROWSER_PATHS[browser_name]
+    print(f"\n[*] Testing browser: {browser_name}")
+
+    remote_log = f"C:\\tmp\\mitm_{browser_name}.log"
+
+    # Start mitmproxy
+    # Start mitmproxy (DESPUÉS, versión robusta con depuración)
+    print("[*] Starting mitmproxy capture...")
+
+    command = f'powershell -ExecutionPolicy Bypass -File "{START_CAPTURE}" "{remote_log}"'
+    stdin, stdout, stderr = ssh.exec_command(command)
+
+    stdout_output = stdout.read().decode().strip()
+    stderr_output = stderr.read().decode().strip()
+
+    print("[✅ STDOUT]:", stdout_output)
+    print("[🚩 STDERR]:", stderr_output)
+
+    time.sleep(2)
+    stdin, stdout, stderr = ssh.exec_command("powershell Get-Process mitmdump")
+    print(stdout.read().decode())
+
+    # Launch browser
+    print(f"[*] Launching {browser_name}...")
+    ssh.exec_command(f"powershell -ExecutionPolicy Bypass -File {OPEN_BROWSER} '{BROWSER_PATH}' 'incognito'")
+    print("[*] Waiting 45 seconds for page to load...")
+    time.sleep(45)
+
+
+    
+    
+
+
+    # Stop mitmproxy
+    print("[*] Stopping mitmproxy...")
+    ssh.exec_command(f"powershell -ExecutionPolicy Bypass -File {STOP_CAPTURE}")
+    time.sleep(5)
+
+    # Prepare file paths
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    local_raw_log = f"logs\\{browser_name}_{timestamp}.log"
+    local_parsed_log = f"logs\\{browser_name}_{timestamp}.json"
+    os.makedirs("logs", exist_ok=True)
+    
+
+    print(f"[*] Downloading log to {local_raw_log} ...")
+    sftp = ssh.open_sftp()
+
+    # Wait for log file to appear
+    max_wait = 10
+    for _ in range(max_wait):
+        stdin, stdout, _ = ssh.exec_command(f"if (Test-Path '{remote_log}') {{ Write-Output 'found' }}")
+        if "found" in stdout.read().decode():
+            break
+        time.sleep(1)
+    else:
+        print(f"[X] Log file not found in VM after {max_wait}s: {remote_log}")
+        continue
+
+    # Download and parse
+    sftp.get(remote_log, local_raw_log)
+    sftp.close()
+
+    print("[*] Parsing log...")
+    parse_log(local_raw_log, local_parsed_log)
+    print(f"[✓] Parsed output saved to {local_parsed_log}")
+
+ssh.close()
+print("[✓] Test run complete.")
