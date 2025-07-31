@@ -1,0 +1,14 @@
+{
+  "vm_name": "BrowserTestVM",
+  "vm_ip": "127.0.0.1",
+  "ssh_port": 2222,
+  "username": "ElioZapata",
+  "password": "5600",
+  "browser_paths": {
+    "opera": "C:/Users/ElioZapata/AppData/Local/Programs/Opera/opera.exe",
+    "chrome": "C:/Program Files/Google/Chrome/Application/chrome.exe" ,
+    "edge":"C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+  },
+  "log_output": "C:/Users/ElioZapata/mitmproxy_logs/mitm_output.log"
+
+}
